@@ -7,13 +7,19 @@ Validation is recorded after execution, not inferred from implemented code.
 | Environment | Scope | Result |
 | --- | --- | --- |
 | Windows, Node 22.23.2, Postman CLI 1.80.0 | Local collection baseline | Passed: 31 requests, 99 assertions, zero failures or skips |
-| Ubuntu 24.04, same pinned runtime and CLI | GitHub Actions baseline | Pending first published run |
+| Ubuntu 24.04, same pinned runtime and CLI | GitHub Actions baseline | Passed: 31 requests, 99 assertions, zero failures |
 
 Expected baseline: 13 lifecycle requests / 45 assertions, and 18 quantity-boundary
 requests / 54 assertions. Total: 31 requests / 99 assertions, with no skipped checks.
 Request and assertion counts are not a count of independent product scenarios.
 The recorded Windows folder durations were 1,277 ms and 1,668 ms. These are
 observations, not performance targets, and exclude CLI startup/installation.
+
+Verified hosted run: [40715919540](https://github.com/baruth91/postman-api-qa-case-study/actions/runs/40715919540),
+executing source commit `ad4a8e2`. The lifecycle took 351 ms and boundary iterations
+419 ms inside the CLI; the full job took about 23 seconds including setup and
+artifact upload. JSON and JUnit reports were successfully uploaded. These timings
+are observations, not performance requirements.
 
 ## Controlled failure
 
