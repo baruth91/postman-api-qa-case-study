@@ -99,8 +99,8 @@ process's lifetime, not database persistence or durability. Demo bearer tokens a
 public fixtures, not real credentials. TLS, OAuth/JWT, concurrency, idempotency,
 performance and comprehensive security testing are outside this first slice.
 
-The next planned case is **Python + Requests + pytest + PostgreSQL**, covering
-SQL, constraints, transactions and API/database consistency in a separate repository.
+Continue with the published **[Python + Requests + pytest + PostgreSQL case](https://github.com/baruth91/python-api-database-qa-case-study)**,
+covering SQL, constraints, transactions and API/database consistency in a separate repository.
 
 ## Official references and license
 
