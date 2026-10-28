@@ -1,0 +1,38 @@
+name: Postman order case checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postman-case-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  orders:
+    name: Order integrity and quantity boundaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run Postman collections against isolated local APIs
+        run: npm test
+      - name: Preserve JSON, JUnit and console evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: postman-order-evidence
+          path: reports/baseline/
+          if-no-files-found: error
+          retention-days: 7

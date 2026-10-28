@@ -1,0 +1,534 @@
+{
+  "info": {
+    "name": "Order integrity - a practical QA case study",
+    "description": "Original educational tests against the local teaching API. Run Lifecycle once against fresh state. Run Quantity boundaries with quantity-cases.json against a separate fresh instance. See the English README and docs for setup, risk rationale and limits.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test(\"Response is JSON\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "orderId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Lifecycle",
+      "description": "An ordered business journey; requests within this folder intentionally share one order ID.",
+      "item": [
+        {
+          "name": "01 - Inspect the starting product",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/products/QA-NOTEBOOK",
+            "description": "01 - Inspect the starting product. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"orderId\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Product and stock match the contract\", () => pm.expect(pm.response.json()).to.eql({sku:\"QA-NOTEBOOK\", name:\"QA notebook\", unitPriceCents:1299, stock:10}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create a two-item order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "description": "02 - Create a two-item order. See docs/test-strategy.md for the risk and oracle.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sku\":\"QA-NOTEBOOK\",\"quantity\":2}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const order = pm.response.json();",
+                  "pm.test(\"Order shape matches the documented schema\", () => {",
+                  " pm.response.to.have.jsonSchema({type:\"object\", additionalProperties:false, required:[\"id\",\"owner\",\"status\",\"items\",\"totalCents\"], properties:{",
+                  "  id:{type:\"string\",format:\"uuid\"}, owner:{type:\"string\",enum:[\"alice\"]}, status:{type:\"string\",enum:[\"confirmed\"]},",
+                  "  totalCents:{type:\"integer\",minimum:1}, items:{type:\"array\",minItems:1,maxItems:1,items:{type:\"object\",additionalProperties:false,required:[\"sku\",\"quantity\",\"unitPriceCents\"],properties:{sku:{type:\"string\"},quantity:{type:\"integer\"},unitPriceCents:{type:\"integer\"}}}}",
+                  " }});",
+                  "});",
+                  "pm.test(\"Order contains the requested items and owner\", () => {",
+                  " pm.expect(order.owner).to.eql(\"alice\");",
+                  " pm.expect(order.status).to.eql(\"confirmed\");",
+                  " pm.expect(order.items).to.eql([{sku:\"QA-NOTEBOOK\", quantity:2, unitPriceCents:1299}]);",
+                  "});",
+                  "pm.test(\"Order total equals independently calculated cents\", () => pm.expect(order.totalCents).to.eql(Number(pm.environment.get(\"expectedTotalCents\"))));",
+                  "pm.test(\"Location points to this order\", () => pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/orders/\"+order.id));",
+                  "if (pm.response.code === 201 && order.id) pm.collectionVariables.set(\"orderId\",order.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Retrieve the same order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/{{orderId}}",
+            "description": "03 - Retrieve the same order. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const order = pm.response.json();",
+                  "pm.test(\"Order shape matches the documented schema\", () => {",
+                  " pm.response.to.have.jsonSchema({type:\"object\", additionalProperties:false, required:[\"id\",\"owner\",\"status\",\"items\",\"totalCents\"], properties:{",
+                  "  id:{type:\"string\",format:\"uuid\"}, owner:{type:\"string\",enum:[\"alice\"]}, status:{type:\"string\",enum:[\"confirmed\"]},",
+                  "  totalCents:{type:\"integer\",minimum:1}, items:{type:\"array\",minItems:1,maxItems:1,items:{type:\"object\",additionalProperties:false,required:[\"sku\",\"quantity\",\"unitPriceCents\"],properties:{sku:{type:\"string\"},quantity:{type:\"integer\"},unitPriceCents:{type:\"integer\"}}}}",
+                  " }});",
+                  "});",
+                  "pm.test(\"Order contains the requested items and owner\", () => {",
+                  " pm.expect(order.owner).to.eql(\"alice\");",
+                  " pm.expect(order.status).to.eql(\"confirmed\");",
+                  " pm.expect(order.items).to.eql([{sku:\"QA-NOTEBOOK\", quantity:2, unitPriceCents:1299}]);",
+                  "});",
+                  "pm.test(\"Order total equals independently calculated cents\", () => pm.expect(order.totalCents).to.eql(Number(pm.environment.get(\"expectedTotalCents\"))));",
+                  "pm.test(\"Identity is preserved\", () => pm.expect(order.id).to.eql(pm.collectionVariables.get(\"orderId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Check exact stock reduction",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/products/QA-NOTEBOOK",
+            "description": "04 - Check exact stock reduction. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Product and stock match the contract\", () => pm.expect(pm.response.json()).to.eql({sku:\"QA-NOTEBOOK\", name:\"QA notebook\", unitPriceCents:1299, stock:8}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Reject another user reading the order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/{{orderId}}",
+            "description": "05 - Reject another user reading the order. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Explicit error: FORBIDDEN\", () => pm.expect(pm.response.json()).to.eql({ error: { code: \"FORBIDDEN\" } }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Reject an anonymous read",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/orders/{{orderId}}",
+            "description": "06 - Reject an anonymous read. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Explicit error: UNAUTHENTICATED\", () => pm.expect(pm.response.json()).to.eql({ error: { code: \"UNAUTHENTICATED\" } }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject an invalid token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-a-valid-demo-token"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/{{orderId}}",
+            "description": "07 - Reject an invalid token. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Explicit error: UNAUTHENTICATED\", () => pm.expect(pm.response.json()).to.eql({ error: { code: \"UNAUTHENTICATED\" } }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Report a missing order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/00000000-0000-4000-8000-000000000000",
+            "description": "08 - Report a missing order. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Explicit error: ORDER_NOT_FOUND\", () => pm.expect(pm.response.json()).to.eql({ error: { code: \"ORDER_NOT_FOUND\" } }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Reject an anonymous write",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "description": "09 - Reject an anonymous write. See docs/test-strategy.md for the risk and oracle.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sku\":\"QA-NOTEBOOK\",\"quantity\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Explicit error: UNAUTHENTICATED\", () => pm.expect(pm.response.json()).to.eql({ error: { code: \"UNAUTHENTICATED\" } }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Check final order inventory",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "description": "10 - Check final order inventory. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exactly one order remains and its identity matches\", () => {",
+                  " const orders = pm.response.json().orders;",
+                  " pm.expect(orders).to.have.lengthOf(1);",
+                  " pm.expect(orders[0].id).to.eql(pm.collectionVariables.get(\"orderId\"));",
+                  " pm.expect(orders[0].items).to.eql([{sku:\"QA-NOTEBOOK\",quantity:2,unitPriceCents:1299}]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Verify another user has no orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bobToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "description": "11 - Verify another user has no orders. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"User listing is isolated\", () => pm.expect(pm.response.json()).to.eql({orders:[]}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - Reject a token without the Bearer scheme",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "demo-alice-token"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/{{orderId}}",
+            "description": "A known token is not valid without the documented Bearer scheme."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Explicit error: UNAUTHENTICATED\", () => pm.expect(pm.response.json()).to.eql({ error: { code: \"UNAUTHENTICATED\" } }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 - Verify rejected writes leave stock unchanged",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/products/QA-NOTEBOOK",
+            "description": "The anonymous write must not consume an additional item."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Product and stock match the contract\", () => pm.expect(pm.response.json()).to.eql({sku:\"QA-NOTEBOOK\", name:\"QA notebook\", unitPriceCents:1299, stock:8}));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Quantity boundaries",
+      "description": "Run with quantity-cases.json against fresh state, independently from Lifecycle.",
+      "item": [
+        {
+          "name": "01 - Reject invalid quantity without creating an order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "description": "01 - Reject invalid quantity without creating an order. See docs/test-strategy.md for the risk and oracle.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{invalidOrder}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"invalidOrder\", JSON.stringify({sku:\"QA-NOTEBOOK\",quantity:pm.iterationData.get(\"quantity\")}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Expected rejection for \"+pm.iterationData.get(\"case\"), () => pm.response.to.have.status(pm.iterationData.get(\"expectedStatus\")));",
+                  "pm.test(\"Error explains the rejection\", () => pm.expect(pm.response.json()).to.eql({error:{code:pm.iterationData.get(\"expectedError\")}}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Verify rejected input leaves stock unchanged",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/products/QA-NOTEBOOK",
+            "description": "02 - Verify rejected input leaves stock unchanged. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Product and stock match the contract\", () => pm.expect(pm.response.json()).to.eql({sku:\"QA-NOTEBOOK\", name:\"QA notebook\", unitPriceCents:1299, stock:10}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Verify rejected input leaves no order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{aliceToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "description": "03 - Verify rejected input leaves no order. See docs/test-strategy.md for the risk and oracle."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Rejected request has no order side effect\", () => pm.expect(pm.response.json()).to.eql({orders:[]}));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "case": "zero",
+    "quantity": 0,
+    "expectedStatus": 400,
+    "expectedError": "INVALID_QUANTITY"
+  },
+  {
+    "case": "negative",
+    "quantity": -1,
+    "expectedStatus": 400,
+    "expectedError": "INVALID_QUANTITY"
+  },
+  {
+    "case": "fractional",
+    "quantity": 1.5,
+    "expectedStatus": 400,
+    "expectedError": "INVALID_QUANTITY"
+  },
+  {
+    "case": "numeric string",
+    "quantity": "2",
+    "expectedStatus": 400,
+    "expectedError": "INVALID_QUANTITY"
+  },
+  {
+    "case": "null",
+    "quantity": null,
+    "expectedStatus": 400,
+    "expectedError": "INVALID_QUANTITY"
+  },
+  {
+    "case": "above available stock",
+    "quantity": 11,
+    "expectedStatus": 409,
+    "expectedError": "INSUFFICIENT_STOCK"
+  }
+]
